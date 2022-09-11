@@ -41,14 +41,19 @@ cur = conn.cursor()
 def getbal():
     cur.execute("select sum(profit)-sum(Fuel_Cost)-sum(Other_Cost) from entries")
     rows = cur.fetchone()
+    Log.info("fetched bal: " + str(rows[0]))
     return str(rows[0])
 def pushintodb(sec,QuestName,Completed,Profit,FuelC,OtherCost):
     Date = date.today()
+    Log.info("Begining Push")
     cur.execute("INSERT INTO entries (Date,Duration,Quest_Name,Completed,profit,Fuel_Cost,Other_Cost) VALUES (?, ?, ?, ?, ?, ?, ?);", (Date, sec, QuestName, Completed, Profit, FuelC, OtherCost))
+    Log.info("Push finished with no errors")
     conn.commit()
 def gettransactionid(QuestName, sec, profit, fuel, other):
+    Log.info("Attempting to get Transaction ID")
     cur.execute("select Transaction_ID from entries where Quest_Name=? and Duration=? and profit=? and Fuel_Cost=? and Other_Cost=?;",(QuestName,sec,profit,fuel,other))
     rows = cur.fetchone()
+    Log.info("fetched transaction ID: " + str(rows[0]))
     return str(rows[0])
 def printcomp(com):
     if com == 1:
@@ -90,35 +95,43 @@ def main():
             profit = 0
             fuel = 0
             other = 0
+            Log.info("Set all default variables")
         while run2:
             printstatus(startTime,quest,comp,profit,fuel,other)
             printoptions()
             sel = input(": ")
             if sel == "1":
                 quest = input("Please enter Mission Title: ")
+                Log.info("Set title to: " + str(quest))
             elif sel == "2":
                 comp = str(input("0] Failed\n1] Completed\n2] Not a Mission\nPlease enter Completion Status: "))
                 if comp == "0" or comp == "1" or comp == "2":
                     comp = int(comp)
+                    Log.info("Set completion to: " + str(comp))
             elif sel == "3":
                 try:
                     profit += int(input("Enter additional profit: "))
+                    Log.info("Set profit to: " + str(profit))
                 except:
                     pass
             elif sel == "4":
                 try:
                     fuel += int(input("Enter additional fuel cost: "))
+                    Log.info("Set fuel to: " + str(fuel))
                 except:
                     pass
             elif sel == "5":
                 try:
                     other += int(input("Enter additional other cost: "))
+                    Log.info("Set other to: " + str(other))
                 except:
                     pass
             elif sel == "9":
                 ui = input(str("You are about to push data!\nThis is irreversible!\nCurrent balance in game should be " + str(int(int(getbal())-fuel-other+profit)) + "\nIf this is correct enter [y] and enter\nOtherwise just press enter.\n"))
                 if ui.lower() == "y":
+                    Log.info("Begining push")
                     dur = round(time.time()-startTime)
+                    Log.info("Set duration to: " + str(dur))
                     pushintodb(dur, quest, comp, profit, fuel, other)
                     print("Transaction ID: " + str(gettransactionid(quest, dur, profit, fuel, other)))
                     run2 = False
