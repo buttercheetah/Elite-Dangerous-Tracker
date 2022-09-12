@@ -29,7 +29,6 @@ f = open('DB.json')
 # a dictionary
 datafile = json.load(f)
 
-
 try:
     Log.info('Attempting to connect to MariaDB')
     conn = mariadb.connect(
