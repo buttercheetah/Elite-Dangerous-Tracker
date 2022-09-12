@@ -4,6 +4,7 @@ import mariadb
 import sys
 import time
 from datetime import date
+import json
 # create a logger Log with name 'question8_log'
 Log = logging.getLogger('Main')
 # create file handler which logs even ERROR messages or higher
@@ -20,15 +21,23 @@ Log.info("------------------------------------------")
 Log.info("Program Ran")
 Log.info("------------------------------------------")
 
+  
+# Opening JSON file
+f = open('DB.json')
+  
+# returns JSON object as 
+# a dictionary
+datafile = json.load(f)
+
 
 try:
     Log.info('Attempting to connect to MariaDB')
     conn = mariadb.connect(
-        user="EliteDU",
-        password="EliteDP",
-        host="192.168.0.217",
-        port=6936,
-        database="ElitDD"
+        user=datafile['user'],
+        password=datafile['password'],
+        host=datafile['host'],
+        port=datafile['port'],
+        database=datafile['database']
 
     )
     Log.info('Connected to MariaDB')
