@@ -37,12 +37,32 @@ except mariadb.Error as e:
     Log.warning(f"Error connecting to MariaDB Platform: {e}")
     sys.exit(1)
 cur = conn.cursor()
+def printpretty(item1,item2):
+    spacing = 20
+    spacing = spacing - len(str(item1))
+    print(item1 + str(" " * spacing) + item2)
+def intWithCommas(x):
+    if type(x) not in [type(0), type(0)]:
+        raise TypeError("Parameter must be an integer.")
+    if x < 0:
+        return '-' + intWithCommas(-x)
+    result = ''
+    while x >= 1000:
+        x, r = divmod(x, 1000)
+        result = ",%03d%s" % (r, result)
+    return "%d%s" % (x, result)
 
 def getbal():
     cur.execute("select sum(profit)-sum(Fuel_Cost)-sum(Other_Cost) from entries")
     rows = cur.fetchone()
-    Log.info("fetched bal: " + str(rows[0]))
-    return str(rows[0])
+    bal = rows[0]
+    Log.info("fetched bal: " + str(bal))
+    return str(bal)
+def getaverage(col):
+    cur.execute("select avg("+str(col)+") from entries;")
+    rows = cur.fetchone()
+    Log.info("fetched average " +str(col) +": " + str(rows[0]))
+    return str(round(int(rows[0])))
 def pushintodb(sec,QuestName,Completed,Profit,FuelC,OtherCost):
     Date = date.today()
     Log.info("Begining Push")
@@ -62,17 +82,33 @@ def printcomp(com):
         return 'Failed'
     else:
         return 'Not Job'
+def getcompletionperc():
+    cur.execute("select count(Completed) from entries where Completed=0;")
+    rows = cur.fetchone()
+    Log.info("fetched Completed=0: " + str(rows[0]))
+    failed = int(rows[0])
+
+    cur.execute("select count(Completed) from entries where Completed=1;")
+    rows = cur.fetchone()
+    Log.info("fetched Completed=1: " + str(rows[0]))
+    comple = int(rows[0])
+
+    return int(comple*100/(comple+failed))
+    
 def printstatus(startTime,quest,comp,profit,fuel,other):
-    print("Bal in DB:", getbal())
-    print("Projected Bal:", int(int(getbal())-fuel-other+profit))
-    print("Date:", date.today())
-    print("Elapsed Time:", round(time.time()-startTime),"sec")
-    print("Quest Name:",quest)
-    print("Completed: ",end="")
-    print(printcomp(comp))
-    print("Profit:",profit)
-    print("Fuel Cost:",fuel)
-    print("Other Cost:",other)
+    printpretty("Bal in DB:", str(intWithCommas(int(getbal()))))
+    printpretty("Projected Bal:", str(intWithCommas(int(int(getbal())-fuel-other+profit))))
+    printpretty("Date:", str(date.today()))
+    printpretty("Elapsed Time:", str(str(round(time.time()-startTime)) + " sec"))
+    printpretty("Quest Name:",str(quest))
+    printpretty("Completed:", str(printcomp(comp)))
+    printpretty("Completion rate:", str(str(getcompletionperc()) + "%"))
+    printpretty("Profit:", str(intWithCommas(int(profit))))
+    printpretty("Average Profit:",  str(intWithCommas(int(getaverage('profit')))))
+    printpretty("Fuel Cost:", str(str(intWithCommas(int(fuel)))))
+    printpretty("Average Fuel Cost:", str(intWithCommas(int(getaverage('Fuel_Cost')))))
+    printpretty("Other Cost:", str(str(intWithCommas(int(other)))))
+    printpretty("Average Other Cost:", str(intWithCommas(int(getaverage('Other_Cost')))))
 def printoptions():
     print("1) Set Mission Title")
     print("2) Set Complete Status")
