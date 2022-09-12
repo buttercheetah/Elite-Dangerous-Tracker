@@ -7,6 +7,8 @@ There are likely thousands of better ways to collect the wanted data than the wa
 
 This program does not automatically create the table, so here is what the table should look like for the program to fuction properly.
 
+Refrences a file `DB.json` for login details. an example is provided in `DB-Example.json`
+
 `define entries;`
 
 | Field          | Type      | Null | Key | Default | Extra          |

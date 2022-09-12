@@ -20,15 +20,26 @@ Log.info("------------------------------------------")
 Log.info("Program Ran")
 Log.info("------------------------------------------")
 
+import json
+  
+# Opening JSON file
+f = open('DB.json')
+  
+# returns JSON object as 
+# a dictionary
+datafile = json.load(f)
+# Iterating through the json
+# list
+
 
 try:
     Log.info('Attempting to connect to MariaDB')
     conn = mariadb.connect(
-        user="EliteDU",
-        password="EliteDP",
-        host="192.168.0.217",
-        port=6936,
-        database="ElitDD"
+        user=datafile['user'],
+        password=datafile['password'],
+        host=datafile['host'],
+        port=datafile['port'],
+        database=datafile['database']
 
     )
     Log.info('Connected to MariaDB')
