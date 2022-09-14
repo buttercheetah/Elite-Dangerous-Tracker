@@ -45,6 +45,25 @@ except mariadb.Error as e:
     Log.warning(f"Error connecting to MariaDB Platform: {e}")
     sys.exit(1)
 cur = conn.cursor()
+
+def recon():
+    global conn,cur
+    try:
+        Log.info('Attempting to connect to MariaDB')
+        conn = mariadb.connect(
+            user=datafile['user'],
+            password=datafile['password'],
+            host=datafile['host'],
+            port=datafile['port'],
+            database=datafile['database']
+
+        )
+        Log.info('Connected to MariaDB')
+
+    except mariadb.Error as e:
+        Log.warning(f"Error connecting to MariaDB Platform: {e}")
+        sys.exit(1)
+    cur = conn.cursor()
 def printpretty(item1,item2):
     spacing = 20
     spacing = spacing - len(str(item1))
@@ -127,20 +146,30 @@ def printoptions():
 def main():
     run = True
     while run:
-        tmp = input("Press enter to start a new job or enter Q to quit: ")
+        tmp = input("Press A to start a new job, T to start trading, or enter Q to quit: ")
         if tmp.lower() == 'q':
             run2 = False
             run = False
-        else:
-            run2 = True
+        elif tmp.lower() == 'a':
+            run2 = 1
             startTime = time.time()
             quest = "Unkown"
             comp = 2
             profit = 0
             fuel = 0
             other = 0
-            Log.info("Set all default variables")
-        while run2:
+            Log.info("Set all default variables for a job")
+        elif tmp.lower() == 't':
+            run2 = 2
+            startTime = time.time()
+            quest = "Unkown"
+            comp = 2
+            profit = 0
+            fuel = 0
+            other = 0
+            Log.info("Set all default variables for trading")
+        while run2 == 1:
+            recon()
             printstatus(startTime,quest,comp,profit,fuel,other)
             printoptions()
             sel = input(": ")
@@ -171,7 +200,7 @@ def main():
                 except:
                     pass
             elif sel == "9":
-                ui = input(str("You are about to push data!\nThis is irreversible!\nCurrent balance in game should be " + str(int(int(getbal())-fuel-other+profit)) + "\nIf this is correct enter [y] and enter\nOtherwise just press enter.\n"))
+                ui = input(str("You are about to push data!\nThis is irreversible!\nCurrent balance in game should be " + str(intWithCommas(int(int(getbal())-fuel-other+profit))) + "\nIf this is correct enter [y] and enter\nOtherwise just press enter.\n"))
                 if ui.lower() == "y":
                     Log.info("Begining push")
                     dur = round(time.time()-startTime)
@@ -179,7 +208,63 @@ def main():
                     pushintodb(dur, quest, comp, profit, fuel, other)
                     print("Transaction ID: " + str(gettransactionid(quest, dur, profit, fuel, other)))
                     run2 = False
-
-
+        if run2 == 2:
+            recon()
+            printpretty("Your Bal:", str(intWithCommas(int(int(getbal())-fuel-other+profit))))
+            tmp = True
+            while tmp:
+                tradeItem = str(input("Enter item you are trading: "))
+                tradeCount = int(input("Enter item count you are trading: "))
+                tradeCost = int(input("Enter per item cost you are trading: "))
+                verification = str(input("Total cost should be " + str(intWithCommas(tradeCount*tradeCost)) + " Y/n"))
+                if verification.lower() != 'n':
+                    other = tradeCount*tradeCost
+                    tmp = False
+            quest = "Trading " + str(tradeCount) + "x " + tradeItem + " at " + str(tradeCost)
+            Log.info("Set title to: " + str(quest))
+            comp = int(2)
+            Log.info("Set completion to: " + str(comp))
+            tmp = True
+            while tmp:
+                tfuel = str(input("Enter fuel cost\nLeave empty when done: "))
+                if tfuel == "":
+                    tmp = False
+                else:
+                    fuel += int(tfuel)
+                    Log.info("Set fuel to: " + str(fuel))
+            
+            eother = str(input("Enter additional other cost: "))
+            if eother == "":
+                pass
+            else:
+                other += int(eother)
+            Log.info("Set other to: " + str(other))
+            profit += int(input("Enter profit: "))
+            Log.info("Set profit to: " + str(profit))
+            tmp = True
+            recon()
+            while tmp:
+                printstatus(startTime,quest,comp,profit,fuel,other)
+                sel = input("1) Additional profit\n2) Additional other costs\n9)finish\n: ")
+                if sel == "1":
+                    try:
+                        profit += int(input("Enter additional profit: "))
+                        Log.info("Set profit to: " + str(profit))
+                    except:
+                        pass
+                elif sel == "2":
+                    try:
+                        other += int(input("Enter additional other cost: "))
+                        Log.info("Set other to: " + str(other))
+                    except:
+                        pass
+                elif sel == "9":
+                    Log.info("Begining push")
+                    dur = round(time.time()-startTime)
+                    Log.info("Set duration to: " + str(dur))
+                    pushintodb(dur, quest, comp, profit, fuel, other)
+                    print("Transaction ID: " + str(gettransactionid(quest, dur, profit, fuel, other)))
+                    run2 = False
+                    tmp = False
 if __name__ == "__main__":
     main()
