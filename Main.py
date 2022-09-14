@@ -5,6 +5,7 @@ import sys
 import time
 from datetime import date
 import json
+import re
 # create a logger Log with name 'question8_log'
 Log = logging.getLogger('Main')
 # create file handler which logs even ERROR messages or higher
@@ -85,8 +86,32 @@ def getbal():
     bal = rows[0]
     Log.info("fetched bal: " + str(bal))
     return str(bal)
-def getaverage(col):
-    cur.execute("select avg("+str(col)+") from entries;")
+def getaverage(col,Date=False,iscom=True):
+    Log.info(str("Getaverage called with data "+str(col)+" | "+str(Date)+" | "+str(iscom)))
+    if iscom == False:
+        if col == 'Duration':
+            Log.info("Running " + "select avg("+str(col)+") from entries where Duration > 60 and MONTH(Date) = "+str(Date[1])+" AND YEAR(Date) = "+str(Date[0])+";")
+            cur.execute("select avg("+str(col)+") from entries where Duration > 60 and MONTH(Date) = "+str(Date[1])+" AND YEAR(Date) = "+str(Date[0])+";")
+        else:
+            Log.info("Running " + "select avg("+str(col)+") from entries where MONTH(Date) = "+str(Date[1])+" AND YEAR(Date) = "+str(Date[0])+";")
+            cur.execute("select avg("+str(col)+") from entries where MONTH(Date) = "+str(Date[1])+" AND YEAR(Date) = "+str(Date[0])+";")
+        rows = cur.fetchone()
+        Log.info("fetched average " +str(col) +": " + str(rows[0]))
+        return str(round(int(rows[0])))
+    if Date != False:
+        Date = str(Date).split("-")
+        if col == 'Duration':
+            #Log.info("Running " + "select avg("+str(col)+") from entries where Duration > 60 and MONTH(Date) = "+str(Date[1])+" AND DAY(Date) = "+str(Date[2])+" AND YEAR(Date) = "+str(Date[0])+";")
+            cur.execute("select avg("+str(col)+") from entries where Duration > 60 and MONTH(Date) = "+str(Date[1])+" AND DAY(Date) = "+str(Date[2])+" AND YEAR(Date) = "+str(Date[0])+";")
+        else:
+            cur.execute("select avg("+str(col)+") from entries where MONTH(Date) = "+str(Date[1])+" AND DAY(Date) = "+str(Date[2])+" AND YEAR(Date) = "+str(Date[0])+";")
+        rows = cur.fetchone()
+        Log.info("fetched average " +str(col) +": " + str(rows[0]))
+        return str(round(int(rows[0])))
+    if col == 'Duration':
+        cur.execute("select avg("+str(col)+") from entries where Duration > 60;")
+    else:
+        cur.execute("select avg("+str(col)+") from entries;")
     rows = cur.fetchone()
     Log.info("fetched average " +str(col) +": " + str(rows[0]))
     return str(round(int(rows[0])))
@@ -121,21 +146,47 @@ def getcompletionperc():
     comple = int(rows[0])
 
     return int(comple*100/(comple+failed))
-    
+def makeprettytable(dalist,spacing):
+    for x in dalist:
+        tspacing = spacing - len(str(x).replace(" ", ""))
+        print(str(x).replace(" ", "") + str(" " * tspacing),end="")
+    print()
 def printstatus(startTime,quest,comp,profit,fuel,other):
-    printpretty("Bal in DB:", str(intWithCommas(int(getbal()))))
-    printpretty("Projected Bal:", str(intWithCommas(int(int(getbal())-fuel-other+profit))))
+    bal = int(getbal())
+    printpretty("Bal:", str(intWithCommas(bal-fuel-other+profit)))
     printpretty("Date:", str(date.today()))
-    printpretty("Elapsed Time:", str(str(round(time.time()-startTime)) + " sec"))
+    if time.time()-startTime > getaverage('Duration'):
+        tmp = "v"
+    else:
+        tmp = "^"
+    printpretty("Elapsed Time:", str(str(round(time.time()-startTime)) + " sec " + str(tmp)))
     printpretty("Quest Name:",str(quest))
     printpretty("Completed:", str(printcomp(comp)))
-    printpretty("Completion rate:", str(str(getcompletionperc()) + "%"))
-    printpretty("Profit:", str(intWithCommas(int(profit))))
+    if comp == 0:
+        tmp = "v"
+    elif comp == 1:
+        tmp = "^"
+    printpretty("Completion rate:", str(str(getcompletionperc()) + "% " + str(tmp)))
+    if profit < getaverage('profit'):
+        tmp = "v"
+    else:
+        tmp = "^"
+    printpretty("Profit:", str(intWithCommas(int(profit)) + " " + str(tmp)))
+    if fuel < getaverage('Fuel_Cost'):
+        tmp = "v"
+    else:
+        tmp = "^"
+    printpretty("Fuel Cost:", str(intWithCommas(int(fuel)) + " " + str(tmp)))
+    if fuel < getaverage('Other_Cost'):
+        tmp = "v"
+    else:
+        tmp = "^"
+    printpretty("Other Cost:", str(intWithCommas(int(other)) + " " + str(tmp)))
+def printaverages():
     printpretty("Average Profit:",  str(intWithCommas(int(getaverage('profit')))))
-    printpretty("Fuel Cost:", str(str(intWithCommas(int(fuel)))))
     printpretty("Average Fuel Cost:", str(intWithCommas(int(getaverage('Fuel_Cost')))))
-    printpretty("Other Cost:", str(str(intWithCommas(int(other)))))
     printpretty("Average Other Cost:", str(intWithCommas(int(getaverage('Other_Cost')))))
+    printpretty("Average Time spent:", str(intWithCommas(int(getaverage('Duration')))))
 def printoptions():
     print("1) Set Mission Title")
     print("2) Set Complete Status")
@@ -143,10 +194,33 @@ def printoptions():
     print("4) Add to fuel cost")
     print("5) Add to other cost")
     print("9) Finish")
+def getUniqeDates():
+    cur.execute("select distinct Date from entries;")
+    rows = cur.fetchall()
+    rows = str(rows).replace("(datetime.date", "").replace(",),", "").replace("[", "").replace("]", "")
+    rows = str(rows).replace(",)", "")
+    rows = str(rows).replace(", ", "-")
+    rows = str(rows).replace(")", "|").replace("(", "")
+    rows = rows.split("|")
+    #rows = rows.split(",")
+    Log.info("fetched all unuqie dates " + str(rows))
+    return rows
+def nospaceinstring(item):
+    return str(item).replace(" ", "")
+def getUniqeMonths():
+    UniqeDates = getUniqeDates()
+    nlist = []
+    for i in range(len(UniqeDates)-1):
+        mon = str(UniqeDates[i]).split("-")
+        if (nospaceinstring(mon[0]),nospaceinstring(mon[1])) in nlist:
+            pass
+        else:
+            nlist.append((nospaceinstring(mon[0]),nospaceinstring(mon[1])))
+    return nlist
 def main():
     run = True
     while run:
-        tmp = input("Press A to start a new job, T to start trading, or enter Q to quit: ")
+        tmp = input("Press A to start a new job, T to start trading, S for statistics, or enter Q to quit: ")
         if tmp.lower() == 'q':
             run2 = False
             run = False
@@ -168,6 +242,9 @@ def main():
             fuel = 0
             other = 0
             Log.info("Set all default variables for trading")
+        elif tmp.lower() == 's':
+            run2 = 3
+            Log.info("Set required variables for statistics to load")
         while run2 == 1:
             recon()
             printstatus(startTime,quest,comp,profit,fuel,other)
@@ -266,5 +343,34 @@ def main():
                     print("Transaction ID: " + str(gettransactionid(quest, dur, profit, fuel, other)))
                     run2 = False
                     tmp = False
+        while run2 == 3:
+            printaverages()
+            print("1) Breakdown by day")
+            print("2) Breakdown by month")
+            print("9) Quit")
+            sel = str(input(": "))
+            if sel == "1":
+                UniqeDates = getUniqeDates()
+                dalist = ['#','Year','Month','Day','Average profit','Average Fuel Cost','Average Other Cost','Average Duration (sec)']
+                makeprettytable(dalist,20)
+                for i in range(len(UniqeDates)-1):
+                    mon = str(UniqeDates[i]).split("-")
+                    dalist = [str(str(i)+"."),mon[0],mon[1],mon[2],getaverage('profit',UniqeDates[i]),getaverage('Fuel_Cost',UniqeDates[i]),getaverage('Other_Cost',UniqeDates[i]),getaverage('Duration',UniqeDates[i])]
+                    makeprettytable(dalist,20)
+                input("Press enter to go back")
+            elif sel == "2":
+                uniquemonths = getUniqeMonths()
+                dalist = ['#','Year','Month','Average profit','Average Fuel Cost','Average Other Cost','Average Duration (sec)']
+                makeprettytable(dalist,20)
+                for i in range(len(uniquemonths)):
+                    mon = uniquemonths[i]
+                    #mon = str(mon).replace("(","").replace(")","").replace(" ","").replace("'","")
+                    #mon = mon.split(',')
+                    dalist = [str(str(i)+"."),mon[0],mon[1],getaverage('profit',mon,False),getaverage('Fuel_Cost',mon,False),getaverage('Other_Cost',mon,False),getaverage('Duration',mon,False)]
+                    makeprettytable(dalist,20)
+            elif sel == "9":
+                run2=False
+            
+            
 if __name__ == "__main__":
     main()
