@@ -107,7 +107,10 @@ def getaverage(col,Date=False,iscom=True):
             cur.execute("select avg("+str(col)+") from entries where MONTH(Date) = "+str(Date[1])+" AND DAY(Date) = "+str(Date[2])+" AND YEAR(Date) = "+str(Date[0])+";")
         rows = cur.fetchone()
         Log.info("fetched average " +str(col) +": " + str(rows[0]))
-        return str(round(int(rows[0])))
+        rv = (rows[0])
+        if rv == None:
+            rv = 0
+        return str(round(int(rv)))
     if col == 'Duration':
         cur.execute("select avg("+str(col)+") from entries where Duration > 60;")
     else:
@@ -148,14 +151,14 @@ def getcompletionperc():
     return int(comple*100/(comple+failed))
 def makeprettytable(dalist,spacing):
     for x in dalist:
-        tspacing = spacing - len(str(x).replace(" ", ""))
-        print(str(x).replace(" ", "") + str(" " * tspacing),end="")
+        tspacing = spacing - len(str(x))
+        print(str(x) + str(" " * tspacing),end="")
     print()
 def printstatus(startTime,quest,comp,profit,fuel,other):
     bal = int(getbal())
     printpretty("Bal:", str(intWithCommas(bal-fuel-other+profit)))
     printpretty("Date:", str(date.today()))
-    if time.time()-startTime > getaverage('Duration'):
+    if time.time()-startTime > int(getaverage('Duration')):
         tmp = "v"
     else:
         tmp = "^"
@@ -167,17 +170,17 @@ def printstatus(startTime,quest,comp,profit,fuel,other):
     elif comp == 1:
         tmp = "^"
     printpretty("Completion rate:", str(str(getcompletionperc()) + "% " + str(tmp)))
-    if profit < getaverage('profit'):
+    if profit < int(getaverage('profit')):
         tmp = "v"
     else:
         tmp = "^"
     printpretty("Profit:", str(intWithCommas(int(profit)) + " " + str(tmp)))
-    if fuel < getaverage('Fuel_Cost'):
+    if fuel < int(getaverage('Fuel_Cost')):
         tmp = "v"
     else:
         tmp = "^"
     printpretty("Fuel Cost:", str(intWithCommas(int(fuel)) + " " + str(tmp)))
-    if fuel < getaverage('Other_Cost'):
+    if fuel < int(getaverage('Other_Cost')):
         tmp = "v"
     else:
         tmp = "^"
@@ -186,7 +189,7 @@ def printaverages():
     printpretty("Average Profit:",  str(intWithCommas(int(getaverage('profit')))))
     printpretty("Average Fuel Cost:", str(intWithCommas(int(getaverage('Fuel_Cost')))))
     printpretty("Average Other Cost:", str(intWithCommas(int(getaverage('Other_Cost')))))
-    printpretty("Average Time spent:", str(intWithCommas(int(getaverage('Duration')))))
+    printpretty("Average Time spent:", str(intWithCommas(int(getaverage('Duration'))) + " seconds"))
 def printoptions():
     print("1) Set Mission Title")
     print("2) Set Complete Status")
@@ -205,6 +208,11 @@ def getUniqeDates():
     #rows = rows.split(",")
     Log.info("fetched all unuqie dates " + str(rows))
     return rows
+def getlastNmissions(N=10):
+    cur.execute("select * from entries order by Transaction_ID desc limit "+str(N)+";")
+    rows = cur.fetchall()
+    Log.info("fetched all unuqie dates " + str(rows))
+    return rows
 def nospaceinstring(item):
     return str(item).replace(" ", "")
 def getUniqeMonths():
@@ -217,6 +225,21 @@ def getUniqeMonths():
         else:
             nlist.append((nospaceinstring(mon[0]),nospaceinstring(mon[1])))
     return nlist
+def gettradecount():
+    cur.execute("SELECT count(Transaction_ID) FROM entries WHERE Quest_Name like '%Trad%';")
+    rows = cur.fetchone()
+    Log.info("fetched average Trade count: " + str(rows[0]))
+    return (int(rows[0]))
+def getmissioncount():
+    cur.execute("SELECT count(Transaction_ID) FROM entries WHERE Completed=0 or Completed=1;")
+    rows = cur.fetchone()
+    Log.info("fetched average Trade count: " + str(rows[0]))
+    return (int(rows[0]))
+def getsum(col):
+    cur.execute("SELECT sum("+str(col)+") FROM entries;")
+    rows = cur.fetchone()
+    Log.info("fetched sum of "+str(col)+": " + str(rows[0]))
+    return (int(rows[0]))
 def main():
     run = True
     while run:
@@ -345,8 +368,12 @@ def main():
                     tmp = False
         while run2 == 3:
             printaverages()
+            print("Total time spent: " + str(round(float((int(getsum('Duration')) /60)/60),2)) + str(" hours"))
+            print("Trade count: " + str(gettradecount()))
+            print("Mission count: " + str(getmissioncount()))
             print("1) Breakdown by day")
             print("2) Breakdown by month")
+            print("3) Mission log")
             print("9) Quit")
             sel = str(input(": "))
             if sel == "1":
@@ -356,6 +383,8 @@ def main():
                 for i in range(len(UniqeDates)-1):
                     mon = str(UniqeDates[i]).split("-")
                     dalist = [str(str(i)+"."),mon[0],mon[1],mon[2],getaverage('profit',UniqeDates[i]),getaverage('Fuel_Cost',UniqeDates[i]),getaverage('Other_Cost',UniqeDates[i]),getaverage('Duration',UniqeDates[i])]
+                    for x in range(len(dalist)):
+                        dalist[x] = str(dalist[x]).replace(" ", "")
                     makeprettytable(dalist,20)
                 input("Press enter to go back")
             elif sel == "2":
@@ -367,7 +396,24 @@ def main():
                     #mon = str(mon).replace("(","").replace(")","").replace(" ","").replace("'","")
                     #mon = mon.split(',')
                     dalist = [str(str(i)+"."),mon[0],mon[1],getaverage('profit',mon,False),getaverage('Fuel_Cost',mon,False),getaverage('Other_Cost',mon,False),getaverage('Duration',mon,False)]
+                    for x in range(len(dalist)):
+                        dalist[x] = str(dalist[x]).replace(" ", "")
                     makeprettytable(dalist,20)
+                input("Press enter to go back")
+            elif sel == "3":
+                log = getlastNmissions(10)
+                spacing = 0
+                for i in log:
+                    for x in i:
+                        if len(str(x)) > spacing: spacing = len(str(x))+2
+                dalist = ['ID','Title','profit','Fuel Cost','Other Cost','Duration']
+                makeprettytable(dalist,spacing)
+                for i in range(len(log)):
+                    mon = log[i]
+                    #mon = str(mon).replace("(","").replace(")","").replace(" ","").replace("'","")
+                    #mon = mon.split(',')
+                    dalist = [mon[0],mon[3],mon[5],mon[6],mon[7],mon[2]]
+                    makeprettytable(dalist,spacing)
             elif sel == "9":
                 run2=False
             
